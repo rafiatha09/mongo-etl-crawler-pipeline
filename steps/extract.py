@@ -6,6 +6,7 @@ from settings import settings
 
 
 def get_or_create_user(warehouse: MongoWarehouse, user_full_name: str, debug: bool = False):
+    # ETL runs are tied to a user record so we can audit who created data.
     _debug(debug, f"Looking up user '{user_full_name}'.")
     user = warehouse.get_or_create_user(user_full_name)
     _debug(debug, f"Using user id={user.id}.")
@@ -20,10 +21,14 @@ def resolve_links(
 ) -> list[str]:
     provided_links = [link.strip() for link in (links or []) if link and link.strip()]
     if provided_links:
+        # Manual mode is useful for debugging one source without the
+        # noise of the full discovery pipeline.
         deduped = _dedupe_links(provided_links)
         _debug(debug, f"Using {len(deduped)} manually provided link(s).")
         return deduped
 
+    # Auto mode pulls from the predefined source registry and category-specific
+    # discovery helpers in `preprocessing/source_discovery.py`.
     _debug(debug, f"Auto-discovering links for topic='{topic_query}' with max_links={max_links or settings.DISCOVERY_MAX_LINKS}.")
     discovered_links = discover_links(topic_query=topic_query, max_links=max_links or settings.DISCOVERY_MAX_LINKS)
     deduped = _dedupe_links(discovered_links)

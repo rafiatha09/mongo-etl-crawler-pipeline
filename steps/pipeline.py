@@ -19,6 +19,8 @@ def run_market_intelligence_etl(
     end_date: date | None = None,
     debug: bool = False,
 ) -> dict[str, Any]:
+    # This function is the orchestration layer for the whole ETL run.
+    # Each step stays small so the flow is easy to trace in debug logs.
     _debug(debug, "Starting ETL pipeline.")
     warehouse = MongoWarehouse()
     _debug(debug, "MongoDB connection created.")
@@ -31,8 +33,11 @@ def run_market_intelligence_etl(
         f"Applying date filter start_date={start_date.isoformat() if start_date else 'none'} "
         f"end_date={end_date.isoformat() if end_date else 'none'}.",
     )
+    # Extract step: identify the acting user and decide which links to crawl.
     user = get_or_create_user(warehouse, user_full_name=user_full_name, debug=debug)
     resolved_links = resolve_links(topic_query=topic_query, links=links, max_links=max_links, debug=debug)
+    # Transform step: pick the right crawler per link, enrich the result,
+    # and apply date filtering before anything touches MongoDB.
     crawl_results = crawl_links(
         links=resolved_links,
         user=user,
@@ -41,6 +46,8 @@ def run_market_intelligence_etl(
         end_date=end_date,
         debug=debug,
     )
+    # Load step: insert new documents, skip duplicates, and move documents
+    # across collections if the latest classification changed.
     load_summary = load_results(warehouse=warehouse, results=crawl_results, debug=debug)
     domain_metrics = build_domain_metrics(crawl_results)
     _debug(debug, f"Domain metrics built for {len(domain_metrics)} source domains.")

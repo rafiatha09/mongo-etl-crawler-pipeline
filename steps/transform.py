@@ -14,12 +14,16 @@ def crawl_links(
     end_date: date | None = None,
     debug: bool = False,
 ) -> list[CrawlResult]:
+    # The dispatcher keeps crawler-specific logic out of the ETL loop.
+    # Each link is routed to the crawler that knows that source best.
     dispatcher = CrawlerDispatcher()
     results: list[CrawlResult] = []
     for index, link in enumerate(links, start=1):
         crawler = dispatcher.get_crawler(link)
         _debug(debug, f"[{index}/{len(links)}] Crawling {link} with {crawler.__class__.__name__}.")
         result = crawler.extract(link=link, user=user, topic_query=topic_query)
+        # Date filtering happens after extraction because some sources only
+        # expose publish dates once the page content has been parsed.
         result = _apply_date_filter(result=result, start_date=start_date, end_date=end_date, debug=debug)
         _debug(
             debug,
@@ -30,6 +34,8 @@ def crawl_links(
 
 
 def build_domain_metrics(results: list[CrawlResult]) -> dict[str, dict[str, float | int]]:
+    # These metrics are saved with the ETL run so we can quickly inspect
+    # where useful documents came from without querying raw collections.
     metrics: dict[str, dict[str, float | int]] = {}
     for result in results:
         domain = result.metadata.get("source_domain", "unknown") if result.metadata else "unknown"
@@ -73,6 +79,8 @@ def _apply_date_filter(
 
     published_at = result.document.published_at
     if published_at is None:
+        # Missing dates are common for GitHub and some web pages, so the
+        # pipeline keeps them rather than throwing away potentially useful data.
         _debug(debug, f"No published_at found for {result.link}; keeping source.")
         return result
 

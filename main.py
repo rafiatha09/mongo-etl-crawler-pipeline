@@ -25,6 +25,8 @@ def _parse_cli_date(value: str) -> date:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    # The CLI controls the ETL run so teammates can switch between
+    # auto-discovery and manual-link mode without editing code.
     parser = argparse.ArgumentParser(description="Run the AI Market Intelligence MongoDB ETL pipeline.")
     parser.add_argument("--user", default=settings.DEFAULT_USER_FULL_NAME, help="Name of the user running the ETL.")
     parser.add_argument("--topic", default=settings.DEFAULT_TOPIC_QUERY, help="Topic to crawl and enrich.")
@@ -53,6 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_links(cli_links: list[str], links_file: str | None) -> list[str]:
+    # Manual links from the CLI always take priority over auto-discovery.
     links = [link.strip() for link in cli_links if link.strip()]
     if not links_file:
         return links
@@ -82,6 +85,8 @@ def main() -> None:
         print(f"[DEBUG] start_date={args.start_date.isoformat()}")
         print(f"[DEBUG] end_date={args.end_date.isoformat()}")
 
+    # `run_market_intelligence_etl()` is the high-level ETL entrypoint:
+    # extract links -> crawl/transform documents -> load into MongoDB.
     summary = run_market_intelligence_etl(
         user_full_name=args.user,
         topic_query=args.topic,

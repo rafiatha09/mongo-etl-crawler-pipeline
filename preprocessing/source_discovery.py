@@ -12,12 +12,16 @@ from bs4 import BeautifulSoup
 from domain.constants import PREDEFINED_SOURCE_LINKS
 from settings import settings
 
+# Medium discovery is feed-backed so we can reuse article content later
+# without always opening Medium pages directly.
 MEDIUM_RSS_CACHE: dict[str, dict[str, str | None]] = {}
 CATEGORY_ORDER = ["blogs", "github", "job_postings", "news", "research_papers"]
 
 
 def discover_links(topic_query: str, max_links: int | None = None) -> list[str]:
     topic = topic_query.strip() or settings.DEFAULT_TOPIC_QUERY
+    # Auto-discovery tries to keep a balanced mix across the five portfolio
+    # collections instead of returning a random pile of URLs.
     minimum_total = settings.DISCOVERY_MIN_PER_CATEGORY * len(CATEGORY_ORDER)
     target_count = max(max_links or settings.DISCOVERY_MAX_LINKS, minimum_total)
     category_targets = _build_category_targets(target_count)
@@ -44,6 +48,8 @@ def discover_links(topic_query: str, max_links: int | None = None) -> list[str]:
 
 
 def _build_category_targets(target_count: int) -> dict[str, int]:
+    # First reserve the minimum per category, then spread any extra slots
+    # round-robin so one category does not starve the others.
     category_targets = {category: settings.DISCOVERY_MIN_PER_CATEGORY for category in CATEGORY_ORDER}
     extras = max(0, target_count - sum(category_targets.values()))
     for index in range(extras):
@@ -53,6 +59,9 @@ def _build_category_targets(target_count: int) -> dict[str, int]:
 
 
 def _discover_category_links(category: str, topic: str, limit: int) -> list[str]:
+    # Each category has a slightly different discovery strategy:
+    # LinkedIn for jobs, topic pages for GitHub, arXiv listings for papers,
+    # and curated host pages for blogs/news.
     if category == "job_postings":
         return _discover_job_links(topic, limit)
     if category == "github":
@@ -122,6 +131,8 @@ def _expand_predefined_source_links(category: str, limit: int) -> list[str]:
     if not source_urls:
         return []
 
+    # Spread the request across multiple host pages so we do not over-index
+    # on the first source in the list.
     per_source = max(1, math.ceil(limit / len(source_urls)))
     links: list[str] = []
     for source_url in source_urls:
@@ -136,6 +147,8 @@ def _discover_github_links(limit: int) -> list[str]:
     if not source_urls:
         return []
 
+    # GitHub discovery starts from topic pages and then filters down to
+    # repository-looking URLs only.
     per_source = max(1, math.ceil(limit / len(source_urls)))
     links: list[str] = []
     seen: set[str] = set()
@@ -170,6 +183,8 @@ def _discover_research_links(limit: int) -> list[str]:
     if not source_urls:
         return []
 
+    # Research discovery expands recent arXiv listing pages into `/abs/...`
+    # links so the crawler later reads actual paper pages, not index pages.
     per_source = max(1, math.ceil(limit / len(source_urls)))
     links: list[str] = []
     seen: set[str] = set()
@@ -207,6 +222,8 @@ def _discover_links_from_source(source_url: str, limit: int) -> list[str]:
 
 
 def _discover_medium_feed_links(source_url: str, limit: int) -> list[str]:
+    # Medium host pages are unreliable for crawling, so discovery uses the
+    # corresponding RSS feed to get article links instead.
     feed_url = _medium_feed_url(source_url)
     links: list[str] = []
     for entry in _load_medium_feed_entries(feed_url):
@@ -219,6 +236,8 @@ def _discover_medium_feed_links(source_url: str, limit: int) -> list[str]:
 
 
 def get_cached_medium_entry(link: str) -> dict[str, str | None] | None:
+    # During crawling, Medium articles can reuse the feed payload gathered
+    # during discovery instead of fetching the page again.
     normalized = _normalize_link(link)
     cached = MEDIUM_RSS_CACHE.get(normalized)
     if cached is not None:

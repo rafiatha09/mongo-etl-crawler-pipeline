@@ -7,6 +7,8 @@ from networks.mongo import MongoWarehouse
 
 
 def load_results(warehouse: MongoWarehouse, results: list[CrawlResult], debug: bool = False) -> dict[str, Any]:
+    # The load summary becomes part of the ETL run record, so we track
+    # inserts, moves, duplicates, skips, and errors explicitly.
     summary = {
         "saved_count": 0,
         "moved_count": 0,
@@ -27,12 +29,16 @@ def load_results(warehouse: MongoWarehouse, results: list[CrawlResult], debug: b
             _debug(debug, f"Filtered link: {result.link} | status={result.status} reason={result.reason}")
             continue
 
+        # Duplicate handling is link-based across all source collections.
+        # This lets us keep one canonical copy of each crawled URL.
         existing_collection = warehouse.find_source_collection(result.document.link)
         if existing_collection == result.document.collection_name:
             summary["duplicate_count"] += 1
             _debug(debug, f"DUPLICATE -> {result.document.collection_name.value} | {result.link}")
             continue
         if existing_collection is not None and existing_collection != result.document.collection_name:
+            # If classification changes later, we move the source instead of
+            # keeping stale copies in multiple collections.
             warehouse.delete_source(existing_collection, result.document.link)
             warehouse.insert_document(result.document)
             collection_name = result.document.collection_name.value

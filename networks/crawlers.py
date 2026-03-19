@@ -231,6 +231,8 @@ class MediumCrawler(BaseSeleniumCrawler):
         options.add_argument("--disable-blink-features=AutomationControlled")
 
     def extract(self, link: str, user: UserRecord, topic_query: str) -> CrawlResult:
+        # The happy path is RSS-backed content because Medium often places
+        # browser challenges in front of direct page fetches.
         cached_entry = get_cached_medium_entry(link)
         if cached_entry is not None:
             logger.info("Using Medium RSS content for: %s", link)
@@ -314,6 +316,8 @@ class GitHubCrawler(BaseCrawler):
         original_cwd = os.getcwd()
 
         try:
+            # Cloning the repo keeps the GitHub ingestion logic simple and
+            # stable, then we read only the README as the canonical content.
             os.chdir(local_temp)
             clone_process = subprocess.run(["git", "clone", "--depth", "1", link], capture_output=True, text=True)
             if clone_process.returncode != 0:
@@ -399,6 +403,8 @@ class LinkedInJobCrawler(BaseCrawler):
             ),
         )
         published_at = _extract_published_at(soup)
+        # We flatten the main job fields into one text blob so enrichment
+        # and search work the same way as they do for articles and papers.
         content_parts = [
             f"Job title: {title}",
             f"Company: {company}" if company else "",
