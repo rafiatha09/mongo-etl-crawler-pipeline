@@ -1,0 +1,8 @@
+beautifulsoup4>=4.12.3
+chromedriver-autoinstaller>=0.6.4
+langchain-community>=0.3.19
+pydantic>=2.8.2
+pydantic-settings>=2.4.0
+pymongo>=4.8.0
+requests>=2.32.3
+selenium>=4.28.1
