@@ -248,3 +248,16 @@ docker run --rm \
 - Medium can still block direct page fetches; predefined auto-discovery is the safest path there.
 - LinkedIn guest jobs can change their HTML at any time, so `job_postings` depends on LinkedIn availability.
 - GitHub discovery now filters out non-repository pages and ingests README content only.
+
+## Future Improvements
+
+- [ ] Make the `5 per category` target a true refill workflow instead of best-effort discovery
+- [ ] Add fallback and retry logic when one category returns too few valid sources
+- [ ] Harden crawling against source instability, especially Medium and LinkedIn
+- [ ] Improve category classification to reduce misrouted sources
+- [ ] Add automated tests for discovery, crawling, duplicate handling, and date filtering
+- [ ] Add stronger content-quality validation beyond minimum extracted length
+- [ ] Add clearer per-category reporting in the ETL run summary
+- [ ] Add scheduling for recurring ETL runs
+- [ ] Improve handling for throttling, layout changes, and transient network failures
+- [ ] Add a second-stage enrichment layer for smarter tagging or classification later
